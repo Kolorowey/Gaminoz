@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Gaminoz — Stable Layout Preview</title>
+<style>
+  :root{
+    --bg:#0c0c14;--card:#141426;--border:rgba(255,255,255,.08);
+    --text:#e8e8ff;--a1:#ff6a00;--a2:#ff3c00;--a3:#ff9900;
+    --grad:linear-gradient(90deg,var(--a1),var(--a2),var(--a3));
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.35 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu}
+
+  .app{display:flex;min-height:100vh}
+
+  /* Sidebar */
+  .side{width:224px;background:var(--card);border-right:1px solid var(--border);flex-shrink:0;transition:width .25s}
+  .side.collapsed{width:56px}
+  .row{display:flex;align-items:center;gap:8px;padding:8px;margin:8px;border-radius:12px;color:#fff;cursor:pointer;border:0;background:transparent}
+  .row.active{background:rgba(255,106,0,.08)}
+  .ico{width:40px;height:40px;border-radius:12px;border:1px solid var(--a2);box-shadow:0 0 8px var(--a2);display:grid;place-items:center;flex:0 0 auto}
+  .txt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .side.collapsed .txt{display:none}
+  .toggle{margin:8px;width:40px;height:40px;border-radius:12px;border:1px solid var(--border);background:transparent;color:#fff;cursor:pointer}
+
+  /* Main */
+  .main{flex:1;min-width:0;display:flex;flex-direction:column}
+  header{display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid var(--border)}
+  .brand{display:flex;align-items:center;gap:10px}
+  .wm{font-weight:900;font-size:18px;background:var(--grad);-webkit-background-clip:text;color:transparent}
+  .chips{display:flex;gap:8px}
+  .chip{background:var(--grad);color:#fff;padding:6px 8px;border-radius:10px;font-weight:700;font-size:12px}
+  main{flex:1;min-height:0}
+  .wrap{padding:24px 32px;display:flex;flex-direction:column;gap:24px}
+  h2{margin:0 0 12px;font-size:18px}
+  .grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;cursor:pointer}
+  .thumb{position:relative;padding-top:56.25%}
+  .thumb>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .label{position:absolute;left:0;right:0;bottom:0;padding:8px}
+  .label>div{background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.55));border-radius:10px;color:#fff;font-size:12px;font-weight:800;padding:6px 8px}
+  footer{padding:12px;border-top:1px solid var(--border);opacity:.8}
+
+  .player{height:70vh;display:flex;align-items:center;justify-content:center;background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+
+  .emblem{width:28px;height:28px}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" id="side">
+    <button class="toggle" id="toggle">≡</button>
+    <nav id="nav"></nav>
+  </aside>
+  <div class="main">
+    <header>
+      <div class="brand">
+        <svg class="emblem" viewBox="0 0 100 100" aria-label="Gaminoz logo">
+          <defs>
+            <linearGradient id="gGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#ff6a00"/>
+              <stop offset="50%" stop-color="#ff3c00"/>
+              <stop offset="100%" stop-color="#ff9900"/>
+            </linearGradient>
+          </defs>
+          <circle cx="50" cy="50" r="45" fill="url(#gGrad)"/>
+          <circle cx="50" cy="50" r="28" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-dasharray="150 38" transform="rotate(-10 50 50)"/>
+          <rect x="50" y="46" width="18" height="8" rx="4" fill="#fff"/>
+        </svg>
+        <span class="wm">gaminoz</span>
+      </div>
+      <div class="chips">
+        <span class="chip">5000+ games</span>
+        <span class="chip">No install</span>
+        <span class="chip">Play anywhere</span>
+      </div>
+    </header>
+    <main id="view"></main>
+    <footer>© <span id="year"></span> Gaminoz Studios</footer>
+  </div>
+</div>
+
+<script>
+  const ALL_CATEGORIES=[
+    {name:'Home',icon:'🏠'},
+    {name:'Action',icon:'⚔️'},
+    {name:'Adventure',icon:'🗺️'},
+    {name:'Racing',icon:'🏎️'},
+    {name:'Puzzle',icon:'🧩'},
+    {name:'Strategy',icon:'♟️'},
+    {name:'Sports',icon:'🏀'},
+    {name:'Arcade',icon:'🕹️'},
+    {name:'.io',icon:'🌐'},
+    {name:'Casual',icon:'🎯'},
+    {name:'Shooting',icon:'🔫'},
+    {name:'Platform',icon:'🧱'}
+  ];
+
+  function makePoster(title,icon,hue){
+    const svg=`<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='675'>
+      <rect width='100%' height='100%' fill='hsl(${hue},60%,25%)'/>
+      <text x='50%' y='45%' dominant-baseline='middle' text-anchor='middle' font-family='system-ui,Segoe UI,Roboto' font-size='96' fill='white'>${icon}</text>
+      <text x='50%' y='75%' dominant-baseline='middle' text-anchor='middle' font-family='system-ui,Segoe UI,Roboto' font-size='64' font-weight='700' fill='white'>${title}</text>
+    </svg>`;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  }
+
+  function seedGames(){
+    let id=1;const games=[];
+    ALL_CATEGORIES.filter(c=>c.name!=='Home').forEach((cat,ci)=>{
+      for(let j=0;j<3;j++){
+        const title=`${cat.name} Game ${j+1}`;
+        games.push({
+          id:id++,
+          title,
+          slug:(cat.name.toLowerCase().replace(/[^a-z0-9]+/g,'-'))+'-'+(j+1),
+          category:cat.name,
+          poster:makePoster(title,cat.icon,(ci*45+j*15)%360)
+        });
+      }
+    });
+    return games;
+  }
+
+  const state={route:{name:'home',param:null}, collapsed:false, games:seedGames()};
+
+  function el(tag,attrs,...kids){const n=document.createElement(tag);if(attrs){for(const k in attrs){if(k==='class')n.className=attrs[k];else if(k==='style')Object.assign(n.style,attrs[k]);else if(k.startsWith('on'))n.addEventListener(k.slice(2).toLowerCase(),attrs[k]);else n.setAttribute(k,attrs[k]);}}kids.flat().forEach(k=>{if(k==null)return; if(k.nodeType)n.appendChild(k); else n.appendChild(document.createTextNode(k));});return n;}
+
+  function renderSidebar(){
+    const side=document.getElementById('side');
+    side.classList.toggle('collapsed',state.collapsed);
+    const nav=document.getElementById('nav');
+    nav.innerHTML='';
+    nav.appendChild(row('Home','🏠',()=>goHome(), state.route.name==='home'));
+    ALL_CATEGORIES.filter(c=>c.name!=='Home').forEach(cat=>{
+      nav.appendChild(row(cat.name,cat.icon,()=>openCategory(cat.name), state.route.name==='category' && state.route.param===cat.name));
+    });
+  }
+
+  function row(text,icon,onclick,active){
+    return el('button',{class:'row'+(active?' active':''),onclick},
+      el('span',{class:'ico'}, icon),
+      el('span',{class:'txt'}, text)
+    );
+  }
+
+  function goHome(){ state.route={name:'home'}; render(); }
+  function openCategory(name){ state.route={name:'category',param:name}; render(); }
+  function openGame(g){ state.route={name:'play',param:g.slug}; state.activeGame=g; render(); }
+
+  function HomeView(){
+    const featured=state.games.slice(0,12);
+    return el('div',{class:'wrap'},
+      el('section',{}, el('h2',{},'Featured'), gridCards(featured)),
+      el('section',{}, el('h2',{},'Categories'), gridCats())
+    );
+  }
+
+  function gridCards(list){
+    const grid=el('div',{class:'grid'});
+    list.forEach(g=> grid.appendChild(Card(g)) );
+    return grid;
+  }
+
+  function Card(g){
+    const card=el('div',{class:'card',onclick:()=>openGame(g)});
+    const thumb=el('div',{class:'thumb'}, el('img',{src:g.poster,alt:g.title}));
+    const label=el('div',{class:'label'}, el('div',{}, g.title));
+    thumb.appendChild(label); card.appendChild(thumb); return card;
+  }
+
+  function gridCats(){
+    const grid=el('div',{class:'grid'});
+    ALL_CATEGORIES.filter(c=>c.name!=='Home').forEach(cat=>{
+      const b=el('button',{class:'card',onclick:()=>openCategory(cat.name)});
+      const t=el('div',{class:'thumb'});
+      t.appendChild(el('div',{style:{position:'absolute',inset:'0',display:'grid',placeItems:'center',fontSize:'36px'}}, cat.icon));
+      t.appendChild(el('div',{class:'label'}, el('div',{}, `${cat.icon} ${cat.name}`)));
+      b.appendChild(t); grid.appendChild(b);
+    });
+    return grid;
+  }
+
+  function CategoryView(){
+    const list=state.games.filter(g=>g.category===state.route.param);
+    return el('div',{class:'wrap'},
+      el('h1',{style:{fontSize:'22px',fontWeight:'800',margin:'0'}}, `${state.route.param} Games`),
+      gridCards(list)
+    );
+  }
+
+  function PlayView(){
+    const g=state.activeGame || state.games.find(x=>x.slug===state.route.param);
+    const wrap=el('div',{class:'wrap'});
+    const player=el('div',{class:'player'}, 'Game Canvas Placeholder');
+    wrap.appendChild(player);
+    return wrap;
+  }
+
+  function render(){
+    document.getElementById('year').textContent = new Date().getFullYear();
+    renderSidebar();
+    const view=document.getElementById('view');
+    view.innerHTML='';
+    if(state.route.name==='home') view.appendChild(HomeView());
+    else if(state.route.name==='category') view.appendChild(CategoryView());
+    else view.appendChild(PlayView());
+  }
+
+  document.getElementById('toggle').addEventListener('click',()=>{state.collapsed=!state.collapsed; renderSidebar();});
+  render();
+</script>
+</body>
+</html>
